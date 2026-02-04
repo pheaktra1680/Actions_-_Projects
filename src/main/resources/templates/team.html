@@ -69,30 +69,86 @@
 
 <script>
     async function loadTeam() {
-        try {
-            const response = await fetch('/api/staff/list');
-            const staffMembers = await response.json();
-            const teamList = document.getElementById('teamList');
+    try {
+        const response = await fetch('/api/staff/list');
+        const staffMembers = await response.json();
+        const teamList = document.getElementById('teamList');
 
-            teamList.innerHTML = staffMembers.map(staff => `
+        teamList.innerHTML = staffMembers.map(staff => {
+            // Logic for Status Colors
+            // If status is null (new user), default to 'Active'
+            const currentStatus = staff.status || 'Active';
+            const isClosed = currentStatus === 'Closed';
+
+            // Badge Color: success for Active, danger for Closed
+            const badgeClass = isClosed ? 'bg-danger' : 'bg-success';
+
+            // Button Logic: If closed, show 're-activate' icon. If active, show 'power-off' icon.
+            const btnClass = isClosed ? 'btn-outline-success' : 'btn-outline-danger';
+            const btnIcon = isClosed ? 'bi-arrow-clockwise' : 'bi-power';
+            const btnTitle = isClosed ? 'Activate User' : 'Close User';
+
+            return `
                 <tr>
                     <td class="ps-4">
                         <div class="d-flex align-items-center">
+                            <img src="${staff.imagePath || '/images/default-avatar.png'}"
+                                 class="rounded-circle me-3 border" width="35" height="35" style="object-fit: cover;">
                             <span class="fw-semibold text-dark">${staff.name}</span>
                         </div>
                     </td>
                     <td><span class="badge bg-light text-primary border">${staff.staffId}</span></td>
-                    <td><span class="badge bg-success-subtle text-success">Active</span></td>
+                    <td>
+                        <span class="badge ${badgeClass}">${currentStatus}</span>
+                    </td>
                     <td class="text-end pe-4">
-                        <button class="btn btn-sm btn-light border"><i class="bi bi-envelope"></i></button>
+
+                        <button class="btn btn-sm ${btnClass}"
+                                onclick="toggleStatus('${staff.staffId}', '${currentStatus}')"
+                                title="${btnTitle}">
+                            <i class="bi ${btnIcon}"></i>
+                        </button>
                     </td>
                 </tr>
-            `).join('');
-        } catch (error) {
-            console.error("Failed to load team data", error);
+            `;
+        }).join('');
+    } catch (error) {
+        console.error("Failed to load team data", error);
+    }
+}
+
+// Function to handle the toggle
+async function toggleStatus(staffId, currentStatus) {
+    const newStatus = (currentStatus === 'Active') ? 'Closed' : 'Active';
+
+    if (confirm(`Set user ${staffId} to ${newStatus}?`)) {
+        const formData = new FormData();
+        formData.append('staffId', staffId);
+        formData.append('status', newStatus);
+
+        try {
+            const response = await fetch('/api/staff/update-status', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                loadTeam(); // Reload the table to see color changes
+            } else {
+                alert("Error updating status");
+            }
+        } catch (err) {
+            console.error(err);
         }
     }
-    window.onload = loadTeam;
+}
+
+function editUser(id) {
+    // Logic for opening an edit modal
+    console.log("Editing " + id);
+}
+
+window.onload = loadTeam;
 </script>
 </body>
 </html>

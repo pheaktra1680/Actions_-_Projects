@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpSession;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
@@ -17,57 +18,55 @@ import java.util.List;
 @RequestMapping("/api/staff")
 public class StaffController {
 
+    private final String UPLOAD_DIR = "src/main/resources/static/uploads/";
+
     @Autowired
     private StaffRepository staffRepository;
 
     // Use a path relative to the project root
-    private final String UPLOAD_DIR = "src/main/resources/static/uploads/";
+
 
     @GetMapping("/list")
     public List<Staff> getAllStaff() {
         return staffRepository.findAll();
     }
 
-    @Transactional
-    @PostMapping("/add")
-    public ResponseEntity<Object> addStaff(@RequestParam("name") String name,
+    @PostMapping(value = "/add", consumes = {"multipart/form-data"})
+    public ResponseEntity<String> addStaff(@RequestParam("name") String name,
                                            @RequestParam("staffId") String staffId,
                                            @RequestParam("password") String password,
-                                           @RequestParam("image") MultipartFile file) {
+                                           @RequestParam("image") MultipartFile image) {
         try {
-            // 1. Check if user already exists
+            // This print MUST appear in IntelliJ console if hit correctly
+            System.out.println("===> REGISTERING: " + staffId);
+
             if (staffRepository.findByStaffId(staffId).isPresent()) {
-                return ResponseEntity.badRequest().body((Object)"Staff ID already exists!");
+                return ResponseEntity.badRequest().body("Staff ID already exists!");
             }
 
-            // 2. Handle File Path
-            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-            Path uploadPath = Paths.get(UPLOAD_DIR);
+            // Absolute path is safer for local development
+            String uploadDir = System.getProperty("user.dir") + "/src/main/resources/static/uploads/";
+            File dir = new File(uploadDir);
+            if (!dir.exists()) dir.mkdirs();
 
-            // Ensure the folder exists on your hard drive
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            String fileName = System.currentTimeMillis() + "_" + image.getOriginalFilename();
+            Path filePath = Paths.get(uploadDir + fileName);
+            Files.copy(image.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            Files.copy(file.getInputStream(), uploadPath.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-
-            // 3. Save to Database
             Staff s = new Staff();
             s.setName(name);
             s.setStaffId(staffId);
             s.setPassword(password);
             s.setImagePath("/uploads/" + fileName);
+            s.setStatus("Active");
 
-            // saveAndFlush ensures the data is written to the 'action_db' folder immediately
             staffRepository.saveAndFlush(s);
+            System.out.println("===> SUCCESS: Saved to DB");
 
-            System.out.println(">>> Successfully registered: " + staffId);
-            return ResponseEntity.ok((Object)"Staff registered successfully!");
-
+            return ResponseEntity.ok("Success");
         } catch (Exception e) {
-            // This prints the REAL error to your IntelliJ console
             e.printStackTrace();
-            return ResponseEntity.internalServerError().body((Object)"Error: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 
@@ -113,5 +112,16 @@ public class StaffController {
             staffRepository.saveAndFlush(staff);
             return ResponseEntity.ok((Object) "Profile updated successfully!");
         }).orElseGet(() -> ResponseEntity.status(404).body((Object) "Staff member not found."));
+    }
+
+    @Transactional
+    @PostMapping("/update-status")
+    public ResponseEntity<String> updateStatus(@RequestParam("staffId") String staffId,
+                                               @RequestParam("status") String status) {
+        return staffRepository.findByStaffId(staffId).map(staff -> {
+            staff.setStatus(status); // "Active" or "Closed"
+            staffRepository.saveAndFlush(staff);
+            return ResponseEntity.ok("Status changed to " + status);
+        }).orElse(ResponseEntity.status(404).body("Staff not found"));
     }
 }

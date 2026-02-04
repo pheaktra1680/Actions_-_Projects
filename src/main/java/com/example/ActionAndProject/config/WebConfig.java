@@ -12,25 +12,24 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private SessionInterceptor sessionInterceptor;
 
-    // JOB 1: Redirect the root "/" to "/login" automatically
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
         registry.addViewController("/").setViewName("redirect:/login");
     }
 
-    // JOB 2: Register the security check
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(sessionInterceptor)
-                .addPathPatterns("/**") // Protect ALL pages (index, settings, team, etc.)
+                .addPathPatterns("/**")
                 .excludePathPatterns(
-                        "/login",           // Allow access to login page
-                        "/api/auth/**",     // Allow login logic
-                        "/css/**",          // Allow styling
-                        "/js/**",           // Allow scripts
-                        "/images/**",       // Allow logo/images
-                        "/uploads/**",      // Allow profile pictures
-                        "/forgot-password"  // Allow password recovery
+                        "/login",
+                        "/api/auth/**",
+                        "/api/staff/add",   // <--- ADD THIS: Allow registration
+                        "/css/**",
+                        "/js/**",
+                        "/images/**",
+                        "/uploads/**",
+                        "/forgot-password"
                 );
     }
 }

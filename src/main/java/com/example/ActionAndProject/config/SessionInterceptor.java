@@ -12,12 +12,16 @@ public class SessionInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         HttpSession session = request.getSession();
 
-        // FIX: lowercase 'l' to match AuthController
         if (session.getAttribute("loggedStaff") == null) {
-            response.sendRedirect("/login");
+            // Check if it's an AJAX/Fetch request
+            String requestedWith = request.getHeader("X-Requested-With");
+            if ("XMLHttpRequest".equals(requestedWith) || request.getRequestURI().startsWith("/api/")) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session expired");
+            } else {
+                response.sendRedirect("/login");
+            }
             return false;
         }
-
         return true;
     }
 }

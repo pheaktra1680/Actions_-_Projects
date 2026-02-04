@@ -28,15 +28,20 @@ public class AuthController {
         String password = request.get("password");
 
         return staffRepository.findByStaffId(staffId)
-                .filter(s -> s.getPassword().equals(password))
+                .filter(s -> s.getPassword().equals(password)) // Check password
                 .map(s -> {
+                    // --- NEW STATUS CHECK ---
+                    if ("Closed".equalsIgnoreCase(s.getStatus())) {
+                        return ResponseEntity.status(403).body((Object) "Your account has been closed. Please contact the administrator.");
+                    }
+
+                    // If Active, proceed with session setup
                     session.setAttribute("loggedStaff", s.getStaffId());
                     session.setAttribute("staffName", s.getName());
                     session.setAttribute("profilePic", s.getImagePath());
 
                     Map<String, Object> resp = new HashMap<>();
                     resp.put("url", "/index");
-                    // Force cast to Object for Java 8 compatibility
                     return ResponseEntity.ok((Object) resp);
                 })
                 .orElseGet(() -> ResponseEntity.status(401).body((Object) "Invalid Staff ID or Password"));

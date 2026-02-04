@@ -10,21 +10,21 @@
 <body>
 
 <div class="main-container" id="main">
-
     <div class="form-container sign-up-container">
         <form id="regForm" class="form-wrapper" enctype="multipart/form-data">
             <h2 class="fw-bold">Create Account</h2>
-            <input type="text"    id="regName"       class="form-control mb-2" placeholder="Full Name" required />
-            <input type="text"    id="regStaffId"    class="form-control mb-2" placeholder="Staff ID (e.g. ST-001)" required />
-            <input type="password" id="regPass"       class="form-control mb-2" placeholder="Password" required minlength="8" />
+            <input type="text"     id="regName"       class="form-control mb-2" placeholder="Full Name" required />
+            <input type="text"     id="regStaffId"    class="form-control mb-2" placeholder="Staff ID (e.g. ABC20292)" required />
+            <input type="password" id="regPass"       class="form-control mb-2" placeholder="Password (Min 8 chars)" required minlength="8" />
             <input type="password" id="confirmPass"   class="form-control mb-2" placeholder="Confirm Password" required />
+
             <label class="small text-muted align-self-start ms-1">Profile Photo:</label>
-            <input type="file"    id="regImage"      class="form-control mb-2" accept="image/*" required />
+            <input type="file"     id="regImage"      class="form-control mb-2" accept="image/*" required />
 
             <div id="passError" class="text-danger small mb-2" style="display:none;"></div>
             <div id="regMsg"    class="mt-2 small"></div>
 
-            <button type="submit" class="btn_login">Register</button>
+            <button type="submit" id="regBtn" class="btn_login">Register</button>
         </form>
     </div>
 
@@ -32,10 +32,10 @@
         <form id="loginForm" class="form-wrapper">
             <h2 class="fw-bold">Sign In</h2>
             <p class="text-muted small">Please use your Staff ID</p>
-            <input type="text" id="loginStaffId" class="form-control" placeholder="Staff ID EX: ABC20292" required />
-            <input type="password" id="loginPass" class="form-control" placeholder="Password" required />
+            <input type="text"     id="loginStaffId" class="form-control" placeholder="Staff ID EX: ABC20292" required />
+            <input type="password" id="loginPass"    class="form-control" placeholder="Password" required />
             <a href="/forgot-password" class="forgot-link text-sm">Forgot your password?</a>
-            <button type="submit" class="btn_login">Login</button>
+            <button type="submit" id="loginBtn" class="btn_login">Login</button>
             <div id="loginMsg" class="mt-3 small"></div>
         </form>
     </div>
@@ -69,85 +69,94 @@
     document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
         const msg = document.getElementById('loginMsg');
+        const btn = document.getElementById('loginBtn');
+
         msg.innerText = "Authenticating...";
+        msg.className = "mt-3 small text-muted";
+        btn.disabled = true;
 
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                staffId: document.getElementById('loginStaffId').value,
-                password: document.getElementById('loginPass').value
-            })
-        });
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    staffId: document.getElementById('loginStaffId').value,
+                    password: document.getElementById('loginPass').value
+                })
+            });
 
-        if(response.ok) {
-            const data = await response.json();
-            window.location.href = data.url;
-        } else {
-            msg.className = "text-danger small mt-2";
-            msg.innerText = "Invalid Staff ID or password";
+            if(response.ok) {
+                const data = await response.json();
+                window.location.href = data.url;
+            } else {
+                msg.className = "text-danger small mt-2";
+                msg.innerText = "Invalid Staff ID or password";
+                btn.disabled = false;
+            }
+        } catch (err) {
+            msg.innerText = "Server unreachable.";
+            btn.disabled = false;
         }
     };
 
-    // --- REGISTER LOGIC (Using FormData for Image Upload) ---
+    // --- REGISTER LOGIC ---
     document.getElementById('regForm').onsubmit = async (e) => {
-    e.preventDefault();
+        e.preventDefault();
 
-    const msg = document.getElementById('regMsg');
-    const err = document.getElementById('passError');
-    msg.innerText = "";
-    err.style.display = 'none';
+        const msg = document.getElementById('regMsg');
+        const err = document.getElementById('passError');
+        const btn = document.getElementById('regBtn');
 
-    const pass = document.getElementById('regPass').value;
-    const confirm = document.getElementById('confirmPass').value;
+        msg.innerText = "";
+        err.style.display = 'none';
 
-    if (pass !== confirm) {
-        err.innerText = "Passwords do not match!";
-        err.style.display = 'block';
-        return;
-    }
+        const pass = document.getElementById('regPass').value;
+        const confirm = document.getElementById('confirmPass').value;
 
-    if (pass.length < 8) {
-        err.innerText = "Password must be at least 8 characters!";
-        err.style.display = 'block';
-        return;
-    }
-
-    msg.innerText = "Creating account...";
-    msg.className = "mt-2 small text-muted";
-
-    const formData = new FormData();
-    formData.append('name',          document.getElementById('regName').value);
-    formData.append('staffId',       document.getElementById('regStaffId').value);
-    formData.append('password',      pass);
-    formData.append('confirmPassword', confirm);          // ← added
-    formData.append('image',         document.getElementById('regImage').files[0]);
-
-    try {
-        const response = await fetch('/api/staff/add', {
-            method: 'POST',
-            body: formData
-        });
-
-        const resultText = await response.text();
-
-        if (response.ok) {
-            // Success path
-            alert("Registration successful!\nYou can now log in.");
-            main.classList.remove("active");           // go back to login view
-            document.getElementById('regForm').reset();
-            msg.innerText = "";
-        } else {
-            // Show real error from backend
-            msg.innerText = resultText || `Error (${response.status})`;
-            msg.className = "mt-2 small text-danger";
+        // Validation
+        if (pass !== confirm) {
+            err.innerText = "Passwords do not match!";
+            err.style.display = 'block';
+            return;
         }
-    } catch (err) {
-        msg.innerText = "Network error: " + err.message;
-        msg.className = "mt-2 small text-danger";
-        console.error(err);
-    }
-};
+
+        // Show Loading State
+        msg.innerText = "Uploading profile...";
+        msg.className = "mt-2 small text-primary";
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('name',     document.getElementById('regName').value);
+        formData.append('staffId',  document.getElementById('regStaffId').value);
+        formData.append('password', pass);
+        // 'image' matches @RequestParam("image") in Java
+        formData.append('image',    document.getElementById('regImage').files[0]);
+
+        try {
+            const response = await fetch('/api/staff/add', {
+                method: 'POST',
+                // Note: Do NOT set Content-Type header when sending FormData
+                body: formData
+            });
+
+            const resultText = await response.text();
+
+            if (response.ok) {
+                alert("Registration successful! You can now log in.");
+                main.classList.remove("active"); // Slide back to login view
+                document.getElementById('regForm').reset();
+                msg.innerText = "";
+            } else {
+                msg.innerText = resultText || "Registration failed.";
+                msg.className = "mt-2 small text-danger";
+            }
+        } catch (error) {
+            msg.innerText = "Network error: " + error.message;
+            msg.className = "mt-2 small text-danger";
+        } finally {
+            btn.disabled = false;
+        }
+    };
 </script>
 </body>
 </html>

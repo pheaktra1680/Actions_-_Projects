@@ -40,4 +40,9 @@ public class PageController {
     public String settingsPage() {
         return "settings";
     }
+
+    @GetMapping("/projects/create")
+    public String projectCreate() {
+        return "projects-create";
+    }
 }

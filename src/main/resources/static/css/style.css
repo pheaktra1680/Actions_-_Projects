@@ -221,3 +221,12 @@ body {
     object-position: 50% 20%;
     background: white;
 }
+/* Make multi-select look cleaner */
+#pMembers option {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+#pMembers option:checked {
+    background-color: #cea530 !important;
+    color: white;
+}
