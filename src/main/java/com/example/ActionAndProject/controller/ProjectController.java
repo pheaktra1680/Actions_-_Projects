@@ -6,11 +6,12 @@ import com.example.ActionAndProject.repository.ProjectRepository;
 import com.example.ActionAndProject.repository.StaffRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
 
 @RestController
+@RequestMapping("/api/projects") // This was missing!
 public class ProjectController {
 
     @Autowired
@@ -19,9 +20,16 @@ public class ProjectController {
     @Autowired
     private StaffRepository staffRepository;
 
+    // Fetch all projects for the list view
+    @GetMapping("/all")
+    public ResponseEntity<Iterable<Project>> getAllProjects() {
+        return ResponseEntity.ok(projectRepository.findAll());
+    }
+
     @PostMapping("/create")
     public ResponseEntity<Object> createProject(@RequestBody ProjectRequest req) {
         try {
+            // Check for duplicate project code
             if (projectRepository.findByProjectCode(req.code).isPresent()) {
                 return ResponseEntity.badRequest().body("Project Code already exists!");
             }
@@ -32,17 +40,26 @@ public class ProjectController {
             project.setProgram(req.program);
             project.setCategory(req.category);
 
-            // Fetch each staff member by ID and add to the project
-            for (String sId : req.memberIds) {
-                staffRepository.findByStaffId(sId).ifPresent(staff -> {
-                    project.getMembers().add(staff);
-                });
+            // Initialize members list to avoid NullPointerException
+            if (project.getMembers() == null) {
+                project.setMembers(new ArrayList<>());
+            }
+
+            // Fetch and link members
+            if (req.memberIds != null) {
+                for (String sId : req.memberIds) {
+                    staffRepository.findByStaffId(sId).ifPresent(staff -> {
+                        project.getMembers().add(staff);
+                    });
+                }
             }
 
             projectRepository.save(project);
             return ResponseEntity.ok("Project Created Successfully");
         } catch (Exception e) {
+            e.printStackTrace(); // Always log the stack trace for debugging
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
+
 }

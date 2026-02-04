@@ -45,4 +45,9 @@ public class PageController {
     public String projectCreate() {
         return "projects-create";
     }
+
+    @GetMapping("/projects/all")
+    public String projectList() {
+        return "projects-list";
+    }
 }
