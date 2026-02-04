@@ -1,7 +1,8 @@
 package com.example.ActionAndProject.controller;
 
-import com.example.ActionAndProject.model.User;
-import com.example.ActionAndProject.repository.UserRepository;
+import com.example.ActionAndProject.model.Staff;
+import com.example.ActionAndProject.repository.StaffRepository;
+import com.example.ActionAndProject.service.TelegramService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,72 +17,95 @@ import java.util.Map;
 public class AuthController {
 
     @Autowired
-    private UserRepository userRepository;
+    private StaffRepository staffRepository;
 
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
-        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
-            return ResponseEntity.badRequest().body("Username is already taken!");
-        }
-        userRepository.save(user);
-        return ResponseEntity.ok("Registration successful!");
-    }
+    @Autowired
+    private TelegramService telegramService;
+
+//    @PostMapping("/login")
+//    public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpSession session) {
+//        String staffId = request.get("staffId");
+//        String password = request.get("password");
+//
+//        return staffRepository.findByStaffId(staffId)
+//                .filter(s -> s.getPassword().equals(password))
+//                .map(s -> {
+//                    // Session Attributes - Crucial for your Interceptor
+//                    session.setAttribute("loggedStaff", s.getStaffId());
+//                    session.setAttribute("staffName", s.getName());
+//
+//                    // Fallback for profile picture if it's null
+//                    String pic = (s.getImagePath() != null) ? s.getImagePath() : "/images/default-user.png";
+//                    session.setAttribute("profilePic", pic);
+//
+//                    Map<String, Object> resp = new HashMap<>();
+//                    resp.put("url", "/index");
+//                    return ResponseEntity.ok((Object) resp);
+//                })
+//                .orElse(ResponseEntity.status(401).body("Invalid ID or Password"));
+//    }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User user, HttpSession session) {
-        return userRepository.findByUsername(user.getUsername())
-                .filter(u -> u.getPassword().equals(user.getPassword()))
-                .map(u -> {
-                    // Success Case: Return a Map
-                    session.setAttribute("user", u.getUsername());
+    public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpSession session) {
+        String staffId = request.get("staffId");
+        String password = request.get("password");
+
+        return staffRepository.findByStaffId(staffId)
+                .filter(s -> s.getPassword().equals(password))
+                .map(s -> {
+                    session.setAttribute("loggedStaff", s.getStaffId());
+                    session.setAttribute("staffName", s.getName());
+                    session.setAttribute("profilePic", s.getImagePath());
+
                     Map<String, String> resp = new HashMap<>();
-                    resp.put("message", "Login successful");
-                    resp.put("url", "/dashboard");
-                    return ResponseEntity.ok((Object) resp); // Cast to Object to satisfy bounds
+                    resp.put("url", "/index");
+                    return ResponseEntity.ok(resp);
                 })
-                .orElseGet(() -> {
-                    // Error Case: Return a Map instead of just a String
-                    Map<String, String> err = new HashMap<>();
-                    err.put("error", "Invalid credentials!");
-                    return ResponseEntity.status(401).body(err);
-                });
+                .orElse(ResponseEntity.status(401).body("Invalid Staff ID or Password"));
     }
 
     @PostMapping("/forgot-password/send-otp")
     public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        return userRepository.findByUsername(username).map(user -> {
-            // Generate a 6-digit code
-            String otp = String.format("%06d", new java.util.Random().nextInt(999999));
-            user.setOtp(otp);
-            user.setOtpExpiry(LocalDateTime.now().plusMinutes(5)); // Valid for 5 mins
-            userRepository.save(user);
+        String staffId = request.get("staffId");
 
-            // Simulate sending: Print to Console
-            System.out.println("\n--- [SECURITY SYSTEM] ---");
-            System.out.println("OTP for " + username + ": " + otp);
-            System.out.println("--------------------------\n");
+        return staffRepository.findByStaffId(staffId).map(staff -> {
+            String otp = String.valueOf((int)((Math.random() * 900000) + 100000));
+            staff.setOtp(otp);
+            staff.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+            staffRepository.save(staff);
 
-            return ResponseEntity.ok("OTP has been sent to your registered device (Check Console)!");
-        }).orElse(ResponseEntity.badRequest().body("Username not found!"));
+            // This will now use your TelegramService with URLEncoder
+            telegramService.sendOTP(staffId, otp);
+
+            return ResponseEntity.ok("Recovery code has been sent to your Telegram!");
+        }).orElse(ResponseEntity.status(404).body("Staff ID not found"));
     }
 
     @PostMapping("/forgot-password/verify")
-    public ResponseEntity<?> verifyAndReset(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        String otpInput = request.get("otp");
+    public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> request) {
+        String staffId = request.get("staffId");
+        String otp = request.get("otp");
         String newPassword = request.get("newPassword");
 
-        return userRepository.findByUsername(username).map(user -> {
-            if (user.getOtp() != null && user.getOtp().equals(otpInput)
-                    && user.getOtpExpiry().isAfter(LocalDateTime.now())) {
-
-                user.setPassword(newPassword);
-                user.setOtp(null); // Clear OTP after use
-                userRepository.save(user);
-                return ResponseEntity.ok("Password reset successful!");
+        return staffRepository.findByStaffId(staffId).map(staff -> {
+            // 1. Password Length Validation (Added fix here)
+            if (newPassword == null || newPassword.length() < 8) {
+                return ResponseEntity.status(400).body("New password must be at least 8 characters long.");
             }
-            return ResponseEntity.status(401).body("Invalid or expired OTP!");
-        }).orElse(ResponseEntity.badRequest().body("User error!"));
+
+            // 2. Check if OTP matches and is not expired
+            if (staff.getOtp() != null && staff.getOtp().equals(otp) &&
+                    staff.getOtpExpiry().isAfter(LocalDateTime.now())) {
+
+                staff.setPassword(newPassword);
+                staff.setOtp(null);
+                staff.setOtpExpiry(null);
+                staffRepository.save(staff);
+
+                return ResponseEntity.ok("Password updated successfully!");
+            } else {
+                return ResponseEntity.status(400).body("Invalid or expired OTP");
+            }
+        }).orElse(ResponseEntity.status(404).body("Staff ID not found"));
     }
 }

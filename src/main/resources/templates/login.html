@@ -12,21 +12,27 @@
 <div class="main-container" id="main">
 
     <div class="form-container sign-up-container">
-        <form id="regForm" class="form-wrapper">
+        <form id="regForm" class="form-wrapper" enctype="multipart/form-data">
             <h2 class="fw-bold">Create Account</h2>
-            <input type="text" id="regUser" class="form-control" placeholder="Username" required />
-            <input type="password" id="regPass" class="form-control" placeholder="Password" required />
-            <input type="password" id="confirmPass" class="form-control" placeholder="Confirm Password" required />
-            <div id="passError" class="text-danger small" style="display:none;">Passwords do not match!</div>
+            <input type="text"    id="regName"       class="form-control mb-2" placeholder="Full Name" required />
+            <input type="text"    id="regStaffId"    class="form-control mb-2" placeholder="Staff ID (e.g. ST-001)" required />
+            <input type="password" id="regPass"       class="form-control mb-2" placeholder="Password" required minlength="8" />
+            <input type="password" id="confirmPass"   class="form-control mb-2" placeholder="Confirm Password" required />
+            <label class="small text-muted align-self-start ms-1">Profile Photo:</label>
+            <input type="file"    id="regImage"      class="form-control mb-2" accept="image/*" required />
+
+            <div id="passError" class="text-danger small mb-2" style="display:none;"></div>
+            <div id="regMsg"    class="mt-2 small"></div>
+
             <button type="submit" class="btn_login">Register</button>
-            <div id="regMsg" class="mt-3 small"></div>
         </form>
     </div>
 
     <div class="form-container sign-in-container">
         <form id="loginForm" class="form-wrapper">
             <h2 class="fw-bold">Sign In</h2>
-            <input type="text" id="loginUser" class="form-control" placeholder="Username" required />
+            <p class="text-muted small">Please use your Staff ID</p>
+            <input type="text" id="loginStaffId" class="form-control" placeholder="Staff ID EX: ABC20292" required />
             <input type="password" id="loginPass" class="form-control" placeholder="Password" required />
             <a href="/forgot-password" class="forgot-link text-sm">Forgot your password?</a>
             <button type="submit" class="btn_login">Login</button>
@@ -37,20 +43,18 @@
     <div class="overlay-container">
         <div class="overlay">
             <div class="overlay-panel overlay-left">
-                <h1 class="fw-bold">Welcome Back!</h1>
-                <p>To keep connected with us please login with your personal info</p>
+                <h1 class="fw-bold">Already a Member?</h1>
+                <p>Login with your Staff ID to access your dashboard</p>
                 <button class="btn_login ghost" id="signIn">Sign In</button>
             </div>
             <div class="overlay-panel overlay-right">
                 <h1 class="fw-bold">Hello, CBD Teams!</h1>
-                <p>Enter your personal details</p>
+                <p>Don't have an account yet? Register your staff profile here.</p>
                 <button class="btn_login ghost" id="signUp">Register Now</button>
             </div>
         </div>
     </div>
 </div>
-
-
 
 <script>
     const signUpButton = document.getElementById('signUp');
@@ -61,7 +65,7 @@
     signUpButton.addEventListener('click', () => main.classList.add("active"));
     signInButton.addEventListener('click', () => main.classList.remove("active"));
 
-    // --- YOUR EXISTING LOGIN FETCH ---
+    // --- LOGIN LOGIC ---
     document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
         const msg = document.getElementById('loginMsg');
@@ -71,7 +75,7 @@
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                username: document.getElementById('loginUser').value,
+                staffId: document.getElementById('loginStaffId').value,
                 password: document.getElementById('loginPass').value
             })
         });
@@ -81,34 +85,69 @@
             window.location.href = data.url;
         } else {
             msg.className = "text-danger small mt-2";
-            msg.innerText = "Invalid credentials";
+            msg.innerText = "Invalid Staff ID or password";
         }
     };
 
-    // --- YOUR EXISTING REGISTER FETCH ---
+    // --- REGISTER LOGIC (Using FormData for Image Upload) ---
     document.getElementById('regForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const pass = document.getElementById('regPass').value;
-        const confirm = document.getElementById('confirmPass').value;
-        if (pass !== confirm) {
-            document.getElementById('passError').style.display = 'block';
-            return;
-        }
+    e.preventDefault();
 
-        const response = await fetch('/api/auth/register', {
+    const msg = document.getElementById('regMsg');
+    const err = document.getElementById('passError');
+    msg.innerText = "";
+    err.style.display = 'none';
+
+    const pass = document.getElementById('regPass').value;
+    const confirm = document.getElementById('confirmPass').value;
+
+    if (pass !== confirm) {
+        err.innerText = "Passwords do not match!";
+        err.style.display = 'block';
+        return;
+    }
+
+    if (pass.length < 8) {
+        err.innerText = "Password must be at least 8 characters!";
+        err.style.display = 'block';
+        return;
+    }
+
+    msg.innerText = "Creating account...";
+    msg.className = "mt-2 small text-muted";
+
+    const formData = new FormData();
+    formData.append('name',          document.getElementById('regName').value);
+    formData.append('staffId',       document.getElementById('regStaffId').value);
+    formData.append('password',      pass);
+    formData.append('confirmPassword', confirm);          // ← added
+    formData.append('image',         document.getElementById('regImage').files[0]);
+
+    try {
+        const response = await fetch('/api/staff/add', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                username: document.getElementById('regUser').value,
-                password: pass
-            })
+            body: formData
         });
 
-        if(response.ok) {
-            alert("Registration successful! Now login.");
-            main.classList.remove("active");
+        const resultText = await response.text();
+
+        if (response.ok) {
+            // Success path
+            alert("Registration successful!\nYou can now log in.");
+            main.classList.remove("active");           // go back to login view
+            document.getElementById('regForm').reset();
+            msg.innerText = "";
+        } else {
+            // Show real error from backend
+            msg.innerText = resultText || `Error (${response.status})`;
+            msg.className = "mt-2 small text-danger";
         }
-    };
+    } catch (err) {
+        msg.innerText = "Network error: " + err.message;
+        msg.className = "mt-2 small text-danger";
+        console.error(err);
+    }
+};
 </script>
 </body>
 </html>

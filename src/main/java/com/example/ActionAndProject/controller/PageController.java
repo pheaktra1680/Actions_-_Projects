@@ -9,25 +9,35 @@ public class PageController {
 
     @GetMapping("/login")
     public String loginPage(HttpSession session) {
-        if (session.getAttribute("user") != null) {
-            return "redirect:/dashboard"; // Already logged in? Skip the login page!
+        if (session.getAttribute("loggedStaff") != null) {
+            return "redirect:/index";
         }
         return "login";
     }
-    @GetMapping("/register") public String registerPage() { return "register"; }
 
-    @GetMapping("/dashboard")
-    public String dashboard(HttpSession session) {
-        if (session.getAttribute("user") == null) return "redirect:/login";
-        return "dashboard";
+    @GetMapping("/index")
+    public String index() {
+        return "index";
     }
+
     @GetMapping("/logout")
     public String logout(HttpSession session) {
-        session.invalidate(); // This kills the "user" session
+        session.invalidate(); // Clears the session
         return "redirect:/login?logout=true";
     }
+
     @GetMapping("/forgot-password")
     public String forgotPasswordPage() {
-        return "forgot-password"; // This must match the filename in src/main/resources/templates
+        return "forgot-password";
+    }
+
+    @GetMapping("/team")
+    public String teamPage() {
+        return "team";
+    }
+
+    @GetMapping("/settings")
+    public String settingsPage() {
+        return "settings";
     }
 }
