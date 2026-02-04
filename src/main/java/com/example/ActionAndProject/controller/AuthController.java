@@ -22,31 +22,8 @@ public class AuthController {
     @Autowired
     private TelegramService telegramService;
 
-//    @PostMapping("/login")
-//    public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpSession session) {
-//        String staffId = request.get("staffId");
-//        String password = request.get("password");
-//
-//        return staffRepository.findByStaffId(staffId)
-//                .filter(s -> s.getPassword().equals(password))
-//                .map(s -> {
-//                    // Session Attributes - Crucial for your Interceptor
-//                    session.setAttribute("loggedStaff", s.getStaffId());
-//                    session.setAttribute("staffName", s.getName());
-//
-//                    // Fallback for profile picture if it's null
-//                    String pic = (s.getImagePath() != null) ? s.getImagePath() : "/images/default-user.png";
-//                    session.setAttribute("profilePic", pic);
-//
-//                    Map<String, Object> resp = new HashMap<>();
-//                    resp.put("url", "/index");
-//                    return ResponseEntity.ok((Object) resp);
-//                })
-//                .orElse(ResponseEntity.status(401).body("Invalid ID or Password"));
-//    }
-
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpSession session) {
+    public ResponseEntity<Object> login(@RequestBody Map<String, String> request, HttpSession session) {
         String staffId = request.get("staffId");
         String password = request.get("password");
 
@@ -57,12 +34,15 @@ public class AuthController {
                     session.setAttribute("staffName", s.getName());
                     session.setAttribute("profilePic", s.getImagePath());
 
-                    Map<String, String> resp = new HashMap<>();
+                    Map<String, Object> resp = new HashMap<>();
                     resp.put("url", "/index");
-                    return ResponseEntity.ok(resp);
+                    // Force cast to Object for Java 8 compatibility
+                    return ResponseEntity.ok((Object) resp);
                 })
-                .orElse(ResponseEntity.status(401).body("Invalid Staff ID or Password"));
+                .orElseGet(() -> ResponseEntity.status(401).body((Object) "Invalid Staff ID or Password"));
     }
+
+
 
     @PostMapping("/forgot-password/send-otp")
     public ResponseEntity<?> sendOtp(@RequestBody Map<String, String> request) {
